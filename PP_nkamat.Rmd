@@ -1,0 +1,39 @@
+---
+title: "LP Homework"
+output: html_notebook
+---
+
+
+```{r}
+
+library("lpSolveAPI")
+x <- read.lp("4th_Problem.lp")
+y <- read.lp("5th_Problem.lp")
+x
+y
+
+```
+```{r}
+
+solve(x)
+get.objective(x)
+solve(y)
+get.objective(y)
+
+```
+get variables and constraints
+```{r}
+get.constraints(x)
+get.constraints(y)
+
+```
+
+```{r}
+get.variables(x)
+get.variables(y)
+
+
+```
+
+
+
