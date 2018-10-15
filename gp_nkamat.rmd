@@ -1,0 +1,29 @@
+---
+title: "gp_nkamat"
+output:
+  html_document: default
+  pdf_document: default
+---
+```{r}
+library(lpSolveAPI)
+z<- read.lp("gp_nkamat.lp")
+z
+```
+
+```{r}
+solve(z)
+
+```
+```{r}
+get.objective(z)
+
+```
+
+```{r}
+get.variables(z)
+
+```
+
+```{r}
+get.constraints(z)
+```
