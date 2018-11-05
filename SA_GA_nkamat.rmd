@@ -1,0 +1,211 @@
+---
+title: "Metaheuristics__nkamat"
+output:
+  html_document: default
+  pdf_document: default
+  word_document: default
+---
+```{r}
+#Apply Genetic Algorithm to the Portfolio problem (part of SA.rmd). How does the performance of the GA compare to simulated annealing.
+```
+
+```{r}
+#Load Libraries
+library('ggplot2')
+library('quantmod')
+library('GA')
+library('GenSA')
+
+```
+
+```{r}
+#Feeding real-time stock data into the system
+
+tickers <- c("BAC", "F", "GE", "AAPL", "WMT")
+getSymbols(tickers, from = "2008-12-01", to = "2018-10-31")
+P <- NULL
+for(ticker in tickers) {
+ tmp <- Cl(to.monthly(eval(parse(text = ticker))))
+ P <- cbind(P, tmp)
+}
+colnames(P) <- tickers
+R <- diff(log(P))
+R <- R[-1,]
+mu <- colMeans(R)
+sigma <- cov(R)
+library("PerformanceAnalytics")
+pContribCVaR <- ES(weights = rep(0.2, 5), method = "gaussian", portfolio_method = "component", mu = mu, sigma = sigma)$pct_contrib_ES
+obj <- function(w) {
+ fn.call <<- fn.call + 1
+ if (sum(w) == 0) { w <- w + 1e-2 }
+ w <- w / sum(w)
+ CVaR <- ES(weights = w, method = "gaussian", portfolio_method = "component", mu = mu, sigma = sigma)
+ tmp1 <- CVaR$ES
+ tmp2 <- max(CVaR$pct_contrib_ES - 0.225, 0)
+ out <- tmp1 - 1e+3 * tmp2
+ return(out)
+}
+obj1 <- function(w) {
+ fn.call <<- fn.call + 1
+ if (sum(w) == 0) { w <- w + 1e-2 }
+ w <- w / sum(w)
+ CVaR <- ES(weights = w, method = "gaussian", portfolio_method = "component", mu = mu, sigma = sigma)
+ tmp1 <- CVaR$ES
+ tmp2 <- max(CVaR$pct_contrib_ES - 0.225, 0)
+ out1 <- tmp1 + 1e+3 * tmp2
+ return(out1)
+}
+```
+```{r}
+# Rastrigin function
+
+Rastrigin <- function(x1, x2)
+{
+  20 + x1^2 + x2^2 - 10*(cos(2*pi*x1) + cos(2*pi*x2))
+}
+
+x1 <- x2 <- seq(-5.12, 5.12, by = 0.1)
+f <- outer(x1, x2, Rastrigin)
+persp3D(x1, x2, f, theta = 50, phi = 20, color.palette = spectral.colors)
+```
+
+```{r}
+#Applying GA to assign weights for optimum portfolio using min objective
+# Where x1 = BAC, x2 = F, x3 = GE, x4 = AAPL and x5 = WMT
+# Solution is the weights assigned to each of the stocks for optimum portfolio
+set.seed(1234)
+fn.call <<- 0
+gap <- ga(type = "real-valued",fitness=obj,lower=rep(0,5),upper=rep(1,5), popSize = 50,maxiter = 30, pcrossover = 0.75, pmutation = 0.1)
+nsol <- gap@solution
+nsol <- nsol / sum(nsol)
+fn.call.gap <- fn.call
+nsol
+summary(gap)
+plot(gap)
+```
+```{r}
+#Applying GenSA to assign weights to the stocks for optimum portfolio using max objective
+set.seed(1234)
+fn.call <<- 0
+out.GenSA <- GenSA(fn = obj1, lower = rep(0, 5), upper = rep(1, 5), control = list(smooth = FALSE, max.call = 3000))
+fn.call.GenSA <- fn.call
+out.GenSA$value
+out.GenSA$counts
+cat("GenSA call functions", fn.call.GenSA, "times.\n")
+wstar.GenSA <- out.GenSA$par
+wstar.GenSA <- wstar.GenSA / sum(wstar.GenSA)
+rbind(tickers, round(100 * wstar.GenSA, 2))
+100 * (sum(wstar.GenSA * mu) - mean(mu))
+wstar.GenSA
+```
+
+
+```{r}
+#comparing the weights as per both the algorithms
+b <- matrix(c(nsol, wstar.GenSA), nrow = 5, ncol = 2)
+rownames(b) = c("BAC", "F", "GE", "AAPL", "WMT")
+colnames(b) = c("GAPortfolio", "GenSAPortfolio")
+b
+```
+```{r}
+#Comparing the fitness function values
+l <- matrix(c(gap@fitnessValue, out.GenSA$value), nrow = 2)
+rownames(l) = c('GA_Fitness_Value', 'GenSA_Fitness_value')
+l
+```
+```{r}
+#Q2.1Create a dataset with with 20 X, Y values.
+x = c(4,6,9,13,16,20,24,28,35,39,43,49,53,54,59,65,79,78, 82,88)
+y = c(104,128,149,172,191,224,273,299,321,398,441,491,555,583,621,653,697,729,788,821)
+v = matrix(c(x,y), nrow = 20, ncol = 2)
+colnames (v) = c('x', 'y')
+v
+
+```
+```{r}
+#Plotting (x,y) values
+plot(x,y)
+
+```
+```{r}
+#Q2.2 Use GA and SA to search for optimal b0 and b1 estimates. The objective should be to minimize  SSE (sums of square error).
+fun = function(x,y) { (sin(10*x)*cos(10*y)+2)/sqrt(x^4+y^4+1) }
+
+rf <- function (b0,b1) {
+  sum(y - (b0 + b1*x))^2
+}
+rfobj <- function(k) {
+  rf(k[1],k[2])
+}
+
+```
+
+```{r}
+# Using GenSA
+
+set.seed(1234)
+fn.call <<- 0
+out.GenSA <- GenSA(fn = rfobj, lower = rep(0, 2), upper = rep(10, 2), control = list(smooth = FALSE, max.call = 3000))
+fn.call.GenSA <- fn.call
+out.GenSA$value
+out.GenSA$counts
+
+```
+```{r}
+par <- c(62, 6)
+SAr <- GenSA(par=par,fn = function(r) rf(r[1], r[2]), lower = c(60,5), upper = c(65,9))
+SAr[c("value","par","counts")]
+```
+```{r}
+df <- data.frame(x,y)
+plot(x,y,col="red",xlab="x-label",ylab="y-label",main="Simulated Annealing",pch=10)
+abline(64.761956, 8.699954,col="green")
+```
+
+```{r}
+# Using G
+gap <- ga(type = "real-valued", fitness=function(r) - rf(r[1], r[2]), lower=c(60,5), upper=c(66,10), popSize = 50)
+summary(gap)
+plot(gap)
+```
+```{r}
+model=lm(y~x)
+summary(model)
+
+obj1<- function(b0,b1) {
+  sum(y-(b0+b1*x))^2
+}
+```
+```{r}
+df <- data.frame(x,y)
+plot(x,y,col="red",xlab="x-label",ylab="y-label",main="Genetic algorithm",pch=10)
+abline(64.36, 8.7095,col="green")
+```
+
+```{r}
+# Plot for Regression
+X=seq(0,100,length=50)
+Y=seq(100,900,length=50) 
+z=outer(X,Y,fun) 
+ persp3D(X, Y, z, phi = 0, theta = 45,
+  xlab = "X", ylab = "Y",
+  main = "Optimal Parameters for Regression",
+  color.palette = spectral.colors
+)
+filled.contour(X, Y, z, color.palette = spectral.colors)
+```
+
+```{r}
+# Optimal Regression line
+plot(x,y,xlim= c(0, 100), ylim = c(100, 900), xlab="x-value", ylab="y-value", col="blue")
+abline(lsfit(x, y),col = "green")
+```
+```{r}
+df = data.frame(x,y)
+p <- ggplot(data=df, ) + geom_point(mapping= aes(x,y)) 
+p1 <- p + (geom_abline(aes(slope= 8.699954, intercept = 64.761956, colour = "Simulated Annealing")))
+p2 <- p1 + (geom_abline(aes(slope= 8.7095, intercept = 64.36, colour = "Linear Regression")))
+p3 <- p2 + (geom_abline(aes(slope= 8.727063 , intercept = 63.61811 ,colour = "Genetic Algorithm"))) + scale_color_manual("", values = c("Genetic Algorithm" = "black", "Simulated Annealing" = "red", "Linear Regression" = "blue")) + ggtitle("Metaheuristic Plots")
+p3
+```
+
